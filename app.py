@@ -41,18 +41,23 @@ if uploaded_files:
         encode_kwargs={"normalize_embeddings": True}
     )
 
-    # (Optional test)
-    # st.write(huggingface_embeddings.embed_query("Test sentence"))
-
     # Create FAISS vector store
     vectorstore = FAISS.from_documents(final_documents, huggingface_embeddings)
     retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 3})
 
-    # Load Hugging Face LLM using API token
+    # Select model
+    selected_model = st.selectbox(
+        "Choose a model",
+        options=["mistralai/Mistral-7B-v0.1", "google/flan-t5-base"],
+        index=1  # default to smaller one for better local performance
+    )
+
+    # Load Hugging Face model with trust_remote_code for Mistral
     hf = HuggingFacePipeline.from_model_id(
-        model_id="mistralai/Mistral-7B-v0.1",
-        task="text-generation",
+        model_id=selected_model,
+        task="text-generation" if "mistral" in selected_model else "text2text-generation",
         huggingfacehub_api_token=hf_token,
+        model_kwargs={"trust_remote_code": True} if "mistral" in selected_model else {},
         pipeline_kwargs={"temperature": 0.1, "max_new_tokens": 300}
     )
 
@@ -87,3 +92,4 @@ if uploaded_files:
             with st.expander("📌 Source Documents"):
                 for doc in result["source_documents"]:
                     st.write(doc.page_content[:500] + "...")
+
