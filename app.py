@@ -8,7 +8,14 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
-from langchain_community.llms.huggingface_pipeline import HuggingFacePipeline
+from langchain_community.llms import HuggingFacePipeline
+
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    AutoModelForSeq2SeqLM,
+    pipeline
+)
 
 # --- Load environment variables ---
 load_dotenv()
@@ -49,17 +56,47 @@ if uploaded_files:
     selected_model = st.selectbox(
         "Choose a model",
         options=["mistralai/Mistral-7B-v0.1", "google/flan-t5-base"],
-        index=1  # default to smaller one for better local performance
+        index=1  # Default to smaller one for local dev
     )
 
-    # Load Hugging Face model with trust_remote_code for Mistral
-    hf = HuggingFacePipeline.from_model_id(
-        model_id=selected_model,
-        task="text-generation" if "mistral" in selected_model else "text2text-generation",
-        huggingfacehub_api_token=hf_token,
-        model_kwargs={"trust_remote_code": True} if "mistral" in selected_model else {},
-        pipeline_kwargs={"temperature": 0.1, "max_new_tokens": 300}
-    )
+    # Load tokenizer and model using Transformers directly
+    if "mistral" in selected_model:
+        tokenizer = AutoTokenizer.from_pretrained(
+            selected_model,
+            trust_remote_code=True,
+            token=hf_token
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            selected_model,
+            trust_remote_code=True,
+            token=hf_token
+        )
+        hf_pipeline = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=300,
+            temperature=0.1
+        )
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(
+            selected_model,
+            token=hf_token
+        )
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            selected_model,
+            token=hf_token
+        )
+        hf_pipeline = pipeline(
+            "text2text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            max_new_tokens=300,
+            temperature=0.1
+        )
+
+    # Wrap in LangChain HuggingFacePipeline
+    hf = HuggingFacePipeline(pipeline=hf_pipeline)
 
     # Setup RetrievalQA chain
     prompt_template = """
@@ -92,4 +129,5 @@ if uploaded_files:
             with st.expander("📌 Source Documents"):
                 for doc in result["source_documents"]:
                     st.write(doc.page_content[:500] + "...")
+
 
