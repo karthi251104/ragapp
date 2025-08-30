@@ -1,0 +1,11 @@
+# Ignore env and cache
+.env
+__pycache__/
+*.pyc
+
+# Uploaded files
+uploaded_pdfs/
+
+# VS Code or system files
+.vscode/
+.DS_Store
