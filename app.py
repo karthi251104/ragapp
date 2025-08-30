@@ -35,11 +35,16 @@ if uploaded_files:
     final_documents = text_splitter.split_documents(documents)
     
     # Create embeddings
-    huggingface_embeddings = HuggingFaceBgeEmbeddings(
-        model_name="BAAI/bge-small-en-v1.5",
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True}
-    )
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+
+embedding = HuggingFaceBgeEmbeddings(
+    model_name="BAAI/bge-small-en-v1.5",
+    model_kwargs={"device": "cpu"},
+    encode_kwargs={"normalize_embeddings": True}
+)
+
+print(embedding.embed_query("Test sentence"))
+
     
     # Create vector database
     vectorstore = FAISS.from_documents(final_documents, huggingface_embeddings)
