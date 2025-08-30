@@ -27,42 +27,40 @@ if uploaded_files:
     for file in uploaded_files:
         with open(os.path.join("uploaded_pdfs", file.name), "wb") as f:
             f.write(file.getbuffer())
-    
-    # Load & Split PDFs
+
+    # Load & split PDFs
     loader = PyPDFDirectoryLoader("uploaded_pdfs")
     documents = loader.load()
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     final_documents = text_splitter.split_documents(documents)
-    
-    # Create embeddings
-from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 
-embedding = HuggingFaceBgeEmbeddings(
-    model_name="BAAI/bge-small-en-v1.5",
-    model_kwargs={"device": "cpu"},
-    encode_kwargs={"normalize_embeddings": True}
-)
+    # Create HuggingFace embeddings
+    huggingface_embeddings = HuggingFaceBgeEmbeddings(
+        model_name="BAAI/bge-small-en-v1.5",
+        model_kwargs={"device": "cpu"},
+        encode_kwargs={"normalize_embeddings": True}
+    )
 
-print(embedding.embed_query("Test sentence"))
+    # (Optional test)
+    # st.write(huggingface_embeddings.embed_query("Test sentence"))
 
-    
-    # Create vector database
+    # Create FAISS vector store
     vectorstore = FAISS.from_documents(final_documents, huggingface_embeddings)
     retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 3})
-    
-    # Load Hugging Face LLM using token
+
+    # Load Hugging Face LLM using API token
     hf = HuggingFacePipeline.from_model_id(
         model_id="mistralai/Mistral-7B-v0.1",
         task="text-generation",
         huggingfacehub_api_token=hf_token,
         pipeline_kwargs={"temperature": 0.1, "max_new_tokens": 300}
     )
-    
+
     # Setup RetrievalQA chain
     prompt_template = """
     Use the following context to answer the question.
     If you don't know, say "I don't know" instead of making up an answer.
-    
+
     {context}
     Question: {question}
     Answer:
@@ -75,15 +73,16 @@ print(embedding.embed_query("Test sentence"))
         return_source_documents=True,
         chain_type_kwargs={"prompt": prompt}
     )
-    
+
     # User query input
     query = st.text_input("Ask a question about your documents:")
     if query:
         with st.spinner("Searching..."):
             result = retrievalQA.invoke({"query": query})
+
             st.subheader("Answer:")
             st.write(result["result"])
-            
+
             # Show source documents
             with st.expander("📌 Source Documents"):
                 for doc in result["source_documents"]:
